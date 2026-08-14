@@ -211,16 +211,29 @@ jobs:
 
           # 添加 iStore 官方 feed
           if ! grep -q '^src-git istore ' feeds.conf.default; then
+            echo '' >> feeds.conf.default
             echo 'src-git istore https://github.com/linkease/istore;main' >> feeds.conf.default
           fi
 
-          # 更新全部 feeds
+          # 更新全部 feeds（包含 iStore）
           ./scripts/feeds update -a
           ./scripts/feeds install -a
 
-          # 确保 iStore 软件中心被安装到 package tree
+          # 按 iStore 官方方式明确安装 luci-app-store
           ./scripts/feeds install -d y -p istore luci-app-store
 
+          # 确认 iStore 包确实进入 package tree
+          echo "========== iStore PACKAGE CHECK =========="
+
+          if [ ! -f "./package/feeds/istore/luci-app-store/Makefile" ]; then
+            echo "ERROR: luci-app-store was not installed into package tree!"
+            find ./package ./feeds -iname '*istore*' -o -iname '*luci-app-store*' 2>/dev/null || true
+            exit 1
+          fi
+
+          echo "luci-app-store package found."
+          echo "=========================================="
+     
       - name: Custom Packages
         run: |
           cd ./wrt/package/
@@ -240,7 +253,21 @@ jobs:
 
           $GITHUB_WORKSPACE/Scripts/Settings.sh
 
-          make defconfig -j$(nproc) && make clean -j$(nproc)
+          make defconfig -j$(nproc)
+
+          echo "========== iStore CONFIG CHECK =========="
+
+          if ! grep -q '^CONFIG_PACKAGE_luci-app-store=y$' .config; then
+          echo "ERROR: luci-app-store is missing from final .config!"
+          grep -i 'istore\|luci-app-store' .config || true
+          exit 1
+          fi
+
+          grep '^CONFIG_PACKAGE_luci-app-store=y$' .config
+          echo "iStore config OK."
+          echo "========================================="
+
+          make clean -j$(nproc)
 
       - name: Download Packages
         if: env.WRT_TEST != 'true'
