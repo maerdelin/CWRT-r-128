@@ -98,9 +98,60 @@ jobs:
 
       - name: Clone Code
         run: |
-          git clone --depth=1 --single-branch --branch $WRT_BRANCH $WRT_REPO ./wrt/
+          # 1. 拉取 CloseWRT / MTK 25.12 最新源码
+          git clone --filter=blob:none --single-branch --branch "$WRT_BRANCH" "$WRT_REPO" ./wrt/
 
-          cd ./wrt/ && echo "WRT_HASH=$(git log -1 --pretty=format:'%h')" >> $GITHUB_ENV
+          cd ./wrt/
+
+          # 记录 MTK / CloseWRT 原始源码提交
+          MTK_HASH=$(git rev-parse --short=7 HEAD)
+
+          echo "========================================"
+          echo "MTK / CloseWRT source:"
+          git log -1 --oneline
+          echo "========================================"
+
+          # 2. 添加 ImmortalWrt 官方仓库
+          git remote add immortalwrt https://github.com/immortalwrt/immortalwrt.git
+
+          # 3. 拉取 ImmortalWrt 官方 openwrt-25.12 最新源码
+          git fetch immortalwrt \
+            +refs/heads/openwrt-25.12:refs/remotes/immortalwrt/openwrt-25.12
+
+          OFFICIAL_HASH=$(git rev-parse --short=7 immortalwrt/openwrt-25.12)
+
+          echo "========================================"
+          echo "Latest official ImmortalWrt openwrt-25.12:"
+          git log -1 --oneline immortalwrt/openwrt-25.12
+          echo "========================================"
+
+          # 4. 配置 Git 身份，用于生成临时 merge commit
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          # 5. 合并 ImmortalWrt 官方最新 25.12
+          if ! git merge --no-edit immortalwrt/openwrt-25.12; then
+            echo "========================================"
+            echo "ERROR: ImmortalWrt official source merge conflict!"
+            echo "Conflicted files:"
+            git status --short
+            echo "========================================"
+            exit 1
+          fi
+
+          MERGED_HASH=$(git rev-parse --short=7 HEAD)
+
+          echo "========================================"
+          echo "Merge successful."
+          echo "MTK source hash:          $MTK_HASH"
+          echo "ImmortalWrt official:     $OFFICIAL_HASH"
+          echo "Merged source hash:       $MERGED_HASH"
+          echo "Merged source:"
+          git log -1 --oneline
+          echo "========================================"
+
+          # 两个上游版本共同作为缓存版本标识
+          echo "WRT_HASH=${MTK_HASH}+${OFFICIAL_HASH}" >> "$GITHUB_ENV"
 
           # 如果不存在 defconfig 则直接结束工作流
           if [ ! -d "defconfig" ]; then
