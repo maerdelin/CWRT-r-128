@@ -209,8 +209,17 @@ jobs:
         run: |
           cd ./wrt/
 
+          # 添加 iStore 官方 feed
+          if ! grep -q '^src-git istore ' feeds.conf.default; then
+            echo 'src-git istore https://github.com/linkease/istore;main' >> feeds.conf.default
+          fi
+
+          # 更新全部 feeds
           ./scripts/feeds update -a
           ./scripts/feeds install -a
+
+          # 确保 iStore 软件中心被安装到 package tree
+          ./scripts/feeds install -d y -p istore luci-app-store
 
       - name: Custom Packages
         run: |
