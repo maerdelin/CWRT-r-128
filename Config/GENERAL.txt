@@ -4,6 +4,7 @@ CONFIG_PACKAGE_luci-app-openclash=y
 
 # iStore 软件商店
 CONFIG_PACKAGE_luci-app-store=y
+CONFIG_PACKAGE_xz-utils=y
 
 # MTK
 CONFIG_PACKAGE_luci-app-eqos-mtk=n
