@@ -259,7 +259,17 @@ jobs:
 
           if ! grep -q '^CONFIG_PACKAGE_luci-app-store=y$' .config; then
           echo "ERROR: luci-app-store is missing from final .config!"
+
+          echo "========== iStore .config =========="
           grep -i 'istore\|luci-app-store' .config || true
+
+          echo "========== iStore Kconfig =========="
+          grep -n -A15 -B5 'PACKAGE_luci-app-store' tmp/.config-package.in 2>/dev/null || true
+
+          echo "========== iStore package metadata =========="
+          grep -Rni 'luci-app-store' tmp/.packageinfo* 2>/dev/null | head -50 || true
+
+          echo "====================================="
           exit 1
           fi
 
