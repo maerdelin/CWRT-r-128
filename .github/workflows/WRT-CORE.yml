@@ -98,7 +98,7 @@ jobs:
 
       - name: Clone Code
         run: |
-          # 1. 拉取 CloseWRT / MTK 25.12 最新源码
+          # 1. 拉取当前 WRT_BRANCH 对应的 MTK / CloseWRT 最新源码
           git clone --filter=blob:none --single-branch --branch "$WRT_BRANCH" "$WRT_REPO" ./wrt/
 
           cd ./wrt/
@@ -111,28 +111,51 @@ jobs:
           git log -1 --oneline
           echo "========================================"
 
-          # 2. 添加 ImmortalWrt 官方仓库
+          # 2. 从 WRT_BRANCH 自动提取版本号
+          # 示例：
+          #   25.12               -> 25.12
+          #   openwrt-24.10-6.6   -> 24.10
+          OFFICIAL_VERSION=$(echo "$WRT_BRANCH" | grep -oE '[0-9]{2}\.[0-9]{2}' | head -n 1)
+
+          if [ -z "$OFFICIAL_VERSION" ]; then
+            echo "========================================"
+            echo "ERROR: Cannot detect ImmortalWrt version from WRT_BRANCH: $WRT_BRANCH"
+            echo "Expected branch name to contain a version like 25.12 or 24.10."
+            echo "========================================"
+            exit 1
+          fi
+
+          OFFICIAL_BRANCH="openwrt-${OFFICIAL_VERSION}"
+
+          echo "========================================"
+          echo "Detected WRT branch:       $WRT_BRANCH"
+          echo "Official ImmortalWrt branch: $OFFICIAL_BRANCH"
+          echo "========================================"
+
+          # 3. 添加 ImmortalWrt 官方仓库
           git remote add immortalwrt https://github.com/immortalwrt/immortalwrt.git
 
-          # 3. 拉取 ImmortalWrt 官方 openwrt-25.12 最新源码
+          # 4. 自动拉取对应版本的 ImmortalWrt 官方最新源码
           git fetch immortalwrt \
-            +refs/heads/openwrt-25.12:refs/remotes/immortalwrt/openwrt-25.12
+            "+refs/heads/${OFFICIAL_BRANCH}:refs/remotes/immortalwrt/${OFFICIAL_BRANCH}"
 
-          OFFICIAL_HASH=$(git rev-parse --short=7 immortalwrt/openwrt-25.12)
+          OFFICIAL_HASH=$(git rev-parse --short=7 "immortalwrt/${OFFICIAL_BRANCH}")
 
           echo "========================================"
-          echo "Latest official ImmortalWrt openwrt-25.12:"
-          git log -1 --oneline immortalwrt/openwrt-25.12
+          echo "Latest official ImmortalWrt ${OFFICIAL_BRANCH}:"
+          git log -1 --oneline "immortalwrt/${OFFICIAL_BRANCH}"
           echo "========================================"
 
-          # 4. 配置 Git 身份，用于生成临时 merge commit
+          # 5. 配置 Git 身份，用于生成临时 merge commit
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          # 5. 合并 ImmortalWrt 官方最新 25.12
-          if ! git merge --no-edit immortalwrt/openwrt-25.12; then
+          # 6. 合并对应版本 ImmortalWrt 官方最新源码
+          if ! git merge --no-edit "immortalwrt/${OFFICIAL_BRANCH}"; then
             echo "========================================"
             echo "ERROR: ImmortalWrt official source merge conflict!"
+            echo "MTK branch:      $WRT_BRANCH"
+            echo "Official branch: $OFFICIAL_BRANCH"
             echo "Conflicted files:"
             git status --short
             echo "========================================"
